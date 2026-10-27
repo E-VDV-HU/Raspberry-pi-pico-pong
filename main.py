@@ -21,7 +21,7 @@ Button configuration:
 from machine import Pin, SPI # pyright: ignore[reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingModuleSource]
 led = Pin("LED", Pin.OUT)
-led.on()
+led.toggle()
 try:
     import max7219
 except:
@@ -63,6 +63,39 @@ utime.sleep(0.5)
 led.toggle()
 
 utime.sleep(1)
+def preset(var):
+    if var == "checkmark":
+        display.fill(0)
+        matrix = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1, 1],
+            [0, 0, 0, 0, 0, 1, 1, 0],
+            [1, 0, 0, 0, 1, 1, 0, 0],
+            [1, 1, 0, 1, 1, 0, 0, 0],
+            [0, 1, 1, 1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0]
+        ]
+    if var == "cross":
+        display.fill(0)
+        matrix = [
+            [1, 1, 0, 0, 0, 0, 1, 1],
+            [1, 1, 1, 0, 0, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [1, 1, 1, 0, 0, 1, 1, 1],
+            [1, 1, 0, 0, 0, 0, 1, 1]
+        ]
+    if matrix():
+        display.write_matrix(matrix)
+        display.show()
+        return "code 0"
+    else:
+        return ValueError(f"{var} is not found!")
+
+
 def screen_text(text):
     length = len(text)
     column = (length * 8)
@@ -105,18 +138,20 @@ def screen_rotation():
             display.pixel(3, 4, 0)
             display.pixel(4, 4, 0)
             display.show()
-            if switch_pin1():
-                return f"selected rotation: {screen_rotation}"
-            else:
-                screen_rotation = screen_rotation + 90
-                if screen_rotation == 360:
-                    screen_rotation = 0
-                display.set_rotation(screen_rotation)
+        if switch_pin1():
+            return f"selected rotation: {screen_rotation}"
+        else:
+            screen_rotation = screen_rotation + 90
+            if screen_rotation == 360:
+                screen_rotation = 0
+            display.set_rotation(screen_rotation)
         utime.sleep(0.1)
 
 def main():
     screen_text(intro_message)
     print(screen_rotation())
+    preset("checkmark")
+    utime.sleep(1)
     screensaver()
 
 
