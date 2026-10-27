@@ -62,11 +62,10 @@ led.toggle()
 utime.sleep(0.5)
 led.toggle()
 
-utime.sleep(1)
 def preset(var):
     if var == "checkmark":
         display.fill(0)
-        matrix = [
+        matrix_LIST = [
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 1],
             [0, 0, 0, 0, 0, 0, 1, 1],
@@ -78,7 +77,7 @@ def preset(var):
         ]
     if var == "cross":
         display.fill(0)
-        matrix = [
+        matrix_LIST = [
             [1, 1, 0, 0, 0, 0, 1, 1],
             [1, 1, 1, 0, 0, 1, 1, 1],
             [0, 1, 1, 1, 1, 1, 1, 0],
@@ -88,8 +87,8 @@ def preset(var):
             [1, 1, 1, 0, 0, 1, 1, 1],
             [1, 1, 0, 0, 0, 0, 1, 1]
         ]
-    if matrix():
-        display.write_matrix(matrix)
+    if matrix_LIST():
+        display.write_matrix(matrix_LIST)
         display.show()
         return "code 0"
     else:
@@ -113,9 +112,9 @@ def screensaver():
             for y in range(8):
                 display.fill(0)
                 display.pixel(x,y,1)
-                display.show
+                display.show()
                 utime.sleep(0.1)
-                if switch_pin1():
+                if switch_pin1.value():
                     break
 
 def screen_rotation():
@@ -132,12 +131,15 @@ def screen_rotation():
             display.pixel(3, 4, 1)
             display.pixel(4, 4, 1)
             display.show()
-            utime.sleep(0.5)
+            utime.sleep(1)
             display.pixel(3, 3, 0)
             display.pixel(4, 3, 0)
             display.pixel(3, 4, 0)
             display.pixel(4, 4, 0)
             display.show()
+        else:
+            utime.sleep(1)
+        
         if switch_pin1():
             return f"selected rotation: {screen_rotation}"
         else:
