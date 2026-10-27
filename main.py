@@ -75,7 +75,7 @@ def preset(var):
             [0, 1, 1, 1, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0]
         ]
-    if var == "cross":
+    elif var == "cross":
         display.fill(0)
         matrix_LIST = [
             [1, 1, 0, 0, 0, 0, 1, 1],
@@ -87,13 +87,12 @@ def preset(var):
             [1, 1, 1, 0, 0, 1, 1, 1],
             [1, 1, 0, 0, 0, 0, 1, 1]
         ]
-    if matrix_LIST():
-        display.write_matrix(matrix_LIST)
-        display.show()
-        return "code 0"
     else:
         return ValueError(f"{var} is not found!")
-
+    
+    display.write_matrix(matrix_LIST)
+    display.show()
+    return "code 0"
 
 def screen_text(text):
     length = len(text)
@@ -115,39 +114,32 @@ def screensaver():
                 display.show()
                 utime.sleep(0.1)
                 if switch_pin1.value():
-                    break
+                    return "code 0"
 
 def screen_rotation():
     global switch_pin1
-    screen_rotation = display.rotation
     while True:
         display.fill(0)
         display.pixel(3, 0, 1)
         display.pixel(4, 0, 1)
         display.show()
         if switch_pin1.value():
+            display.rotation = display.rotation + 90
+            if display.rotation >= 360:
+                display.rotation = 0
             display.pixel(3, 3, 1)
             display.pixel(4, 3, 1)
             display.pixel(3, 4, 1)
             display.pixel(4, 4, 1)
             display.show()
             utime.sleep(1)
+            if switch_pin1.value():
+                return f"selected rotation: {display.rotation}"
             display.pixel(3, 3, 0)
             display.pixel(4, 3, 0)
             display.pixel(3, 4, 0)
             display.pixel(4, 4, 0)
             display.show()
-        else:
-            utime.sleep(1)
-        
-        if switch_pin1():
-            return f"selected rotation: {screen_rotation}"
-        else:
-            screen_rotation = screen_rotation + 90
-            if screen_rotation == 360:
-                screen_rotation = 0
-            display.set_rotation(screen_rotation)
-        utime.sleep(0.1)
 
 def main():
     screen_text(intro_message)
