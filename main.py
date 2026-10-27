@@ -74,6 +74,17 @@ def screen_text(text):
             utime.sleep(0.1)
         break
 
+def screensaver():
+    while True:
+        for x in range(8):
+            for y in range(8):
+                display.fill(0)
+                display.pixel(x,y,1)
+                display.show
+                utime.sleep(0.1)
+                if switch_pin1():
+                    break
+
 def screen_rotation():
     global switch_pin1
     screen_rotation = display.rotation
@@ -89,23 +100,24 @@ def screen_rotation():
             display.pixel(4, 4, 1)
             display.show()
             utime.sleep(0.5)
+            display.pixel(3, 3, 0)
+            display.pixel(4, 3, 0)
+            display.pixel(3, 4, 0)
+            display.pixel(4, 4, 0)
+            display.show()
             if switch_pin1():
-                display.pixel(3, 3, 0)
-                display.pixel(4, 3, 0)
-                display.pixel(3, 4, 0)
-                display.pixel(4, 4, 0)
-                display.show()
-                break
+                return f"selected rotation: {screen_rotation}"
             else:
                 screen_rotation = screen_rotation + 90
-                if screen_rotation >= 360:
+                if screen_rotation == 360:
                     screen_rotation = 0
                 display.set_rotation(screen_rotation)
         utime.sleep(0.1)
 
 def main():
     screen_text(intro_message)
-    screen_rotation()
+    print(screen_rotation())
+    screensaver()
 
 
 if __name__ == "__main__":
