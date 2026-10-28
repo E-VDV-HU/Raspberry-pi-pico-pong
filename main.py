@@ -155,6 +155,45 @@ def screen_rotation():
             display.fill(0)
             display.show()
 
+def draw_paddle(player, axis): # display.pixel (x, y, on_off)
+    if player == 1:
+        for i in range(8):
+            display.pixel(0,i,0)
+        for i in range(axis - 1, axis + 2):
+            display.pixel(0,i,1)
+    elif player == 2:
+        for i in range(8):
+            display.pixel(7,i,0)
+        for i in range(axis - 1, axis + 2):
+            display.pixel(7,i,1)
+
+def draw_ball(side, curve):
+    for x in range(1,7):
+        for y in range(1,7):
+            display.pixel(x,y,0)
+            
+def pong():
+    axis_p1 = 4
+    axis_p2 = 3
+    while True:
+        draw_paddle(1,axis_p1)
+        draw_paddle(2,axis_p2)
+        utime.sleep(1)
+        if switch_pin1() and switch_pin2():
+            break
+        elif switch_pin1():
+            axis_p1 -= 1
+            if axis_p1 <= 0:
+                axis_p1 = 1
+            elif axis_p1 >= 7:
+                axis_p1 = 6
+        elif switch_pin2:
+            axis_p1 += 1
+            if axis_p1 <= 0:
+                axis_p1 = 1
+            elif axis_p1 >= 7:
+                axis_p1 = 6
+
 def main():
     screen_text(intro_message)
     screen_rotation() 
