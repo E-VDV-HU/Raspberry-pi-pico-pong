@@ -43,6 +43,16 @@ switch_pin3 = 12
 switch_pin4 = 13
 intro_message = "SEGA"
 
+#pong
+axis_p1 = 4
+axis_p2 = 3
+axis_ball = [5,6] # default
+side_ball = "L" #L or R
+curve_ball = 1
+score = [0,0] # [player 1,player2]
+reset = False
+count = 0
+
 # vars check
 if brightness < 0 or brightness >15:
     for i in range(6):
@@ -232,14 +242,13 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
             display.pixel(7,i,1)
 
 def draw_ball(side, curve, axis_ball, count):
-    global axis_p1
-    global axis_p2
+    global axis_p1, axis_p2, score, reset
     if count <=10:
         return side, curve, axis_ball, count + 1
     else:
         count = 0
         for x in range(1,7):
-            for y in range(1,7):
+            for y in range(0,8):
                 display.pixel(x,y,0)
         if side == "L":
             axis_ball[0] -= 1
@@ -272,11 +281,12 @@ def draw_ball(side, curve, axis_ball, count):
                     side = "L"
                 elif side == "L":
                     side = "R"
-                    curve = -abs(curve)
+                    curve = -(curve)
             else:
                 global score, reset
                 score[1] += 1 #global reset var en dan reset ball force en show text score.
                 reset = True
+        
         
         elif axis_ball[0] == 7:
             if axis_ball[1] == 0 and axis_p2 == 1:
@@ -303,22 +313,21 @@ def draw_ball(side, curve, axis_ball, count):
                     side = "L"
                 elif side == "L":
                     side = "R"
-                curve = -abs(curve)
-            elif:
+                curve = -(curve)
+            else:
                 global score, reset
                 score[0] += 1 #global reset var en dan reset ball force en show text score.
                 reset = True
+    display.pixel(axis_ball[0],axis_ball[1],1)
+    if axis_ball[1] == 0 or axis_ball[1] == 7:
+        curve = -(curve)
+    return side,curve,axis_ball,count
 
             
 def pong():
-    axis_p1 = 4
-    axis_p2 = 3
-    axis_ball = [5,6] # default
-    side_ball = "L" #L or R
-    curve_ball = 1
-    score = [0,0] # [player 1,player2]
-    reset = False
+    global axis_p1,axis_p2,axis_ball,side_ball,curve_ball,score,reset,count
     while True:
+        display.fill(0)
         if reset:
             reset = False
             screen_text(f"{score[0]}-{score[1]}")
@@ -333,32 +342,33 @@ def pong():
         side_ball, curve_ball, axis_ball, count = draw_ball(side_ball, curve_ball, axis_ball, count)
         display.show()
         utime.sleep(0.1)
-        if switch_pin1() and switch_pin2():
+        if switch_pin1.value() and switch_pin2.value():
             break
-        elif switch_pin1():
+        elif switch_pin1.value():
             axis_p1 -= 1
             if axis_p1 <= 0:
                 axis_p1 = 1
             elif axis_p1 >= 7:
                 axis_p1 = 6
-        elif switch_pin2():
+        elif switch_pin2.value():
             axis_p1 += 1
             if axis_p1 <= 0:
                 axis_p1 = 1
             elif axis_p1 >= 7:
                 axis_p1 = 6
-        if switch_pin3():
+        if switch_pin3.value():
             axis_p2 -= 1
             if axis_p2 <= 0:
                 axis_p2 = 1
             elif axis_p2 >= 7:
                 axis_p2 = 6
-        elif switch_pin4():
+        elif switch_pin4.value():
             axis_p2 += 1
             if axis_p2 <= 0:
                 axis_p2 = 1
             elif axis_p2 >= 7:
                 axis_p2 = 6
+    display.show()
 
 def main():
     screen_text(intro_message)
@@ -370,7 +380,10 @@ def main():
     preset("cross")
     utime.sleep(1)
     screensaver()
-
+    preset("cross")
+    utime.sleep(1)
+    display.fill(0)
+    display.show
 
 
 if __name__ == "__main__":
