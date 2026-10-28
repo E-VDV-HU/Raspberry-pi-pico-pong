@@ -32,8 +32,14 @@ except:
 
 #vars
 brightness = 10 #between 0 and 15
+
+#player 1 / main controller
 switch_pin1 = 14
 switch_pin2 = 15
+
+#player 2
+switch_pin3 = 12
+switch_pin4 = 13
 intro_message = "SEGA"
 
 # vars check
@@ -48,11 +54,12 @@ spi = SPI(0,baudrate=10_000_000,polarity=1,phase=0,sck=Pin(2),mosi=Pin(3))
 ss = Pin(5, Pin.OUT)
 switch_pin1 = Pin(switch_pin1, Pin.IN, pull=Pin.PULL_DOWN)
 switch_pin2 = Pin(switch_pin2, Pin.IN, pull=Pin.PULL_DOWN)
+switch_pin3 = Pin(switch_pin3, Pin.IN, pull=Pin.PULL_DOWN)
+switch_pin4 = Pin(switch_pin4, Pin.IN, pull=Pin.PULL_DOWN)
 display = max7219.Matrix8x8(spi, ss, 1)
 
 display.brightness(brightness)
-display.set_rotation(270)  # Zet de rotatie op 270 graden, dan is pixel (0,0) links bovenin.
-
+display.set_rotation(270)  # Default @ 270
 # Clear the display.
 display.fill(0)
 display.show()
@@ -82,6 +89,18 @@ def preset(var):
         matrix_LIST = [
             [1, 1, 0, 0, 0, 0, 1, 1],
             [1, 1, 1, 0, 0, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [1, 1, 1, 0, 0, 1, 1, 1],
+            [1, 1, 0, 0, 0, 0, 1, 1]
+        ]
+    elif var == "arrow" or var == "arrow_u":
+        display.fill(0)
+        matrix_LIST = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 1, 1, 1, 1, 1, 1, 0],
             [0, 0, 1, 1, 1, 1, 0, 0],
             [0, 0, 1, 1, 1, 1, 0, 0],
@@ -167,18 +186,24 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
         for i in range(axis - 1, axis + 2):
             display.pixel(7,i,1)
 
-def draw_ball(side, curve):
+def draw_ball(side, curve, axis_ball):
     for x in range(1,7):
         for y in range(1,7):
             display.pixel(x,y,0)
+    if side == "L":
+    
             
 def pong():
     axis_p1 = 4
     axis_p2 = 3
+    axis_ball = [5,6]
+    side_ball = "L"
+    curve_ball = 1
     while True:
         draw_paddle(1,axis_p1)
         draw_paddle(2,axis_p2)
-        utime.sleep(1)
+        display.show()
+        utime.sleep(0.1)
         if switch_pin1() and switch_pin2():
             break
         elif switch_pin1():
@@ -187,18 +212,36 @@ def pong():
                 axis_p1 = 1
             elif axis_p1 >= 7:
                 axis_p1 = 6
-        elif switch_pin2:
+        elif switch_pin2():
             axis_p1 += 1
             if axis_p1 <= 0:
                 axis_p1 = 1
             elif axis_p1 >= 7:
                 axis_p1 = 6
+        if switch_pin3():
+            axis_p2 -= 1
+            if axis_p2 <= 0:
+                axis_p2 = 1
+            elif axis_p2 >= 7:
+                axis_p2 = 6
+        elif switch_pin4():
+            axis_p2 += 1
+            if axis_p2 <= 0:
+                axis_p2 = 1
+            elif axis_p2 >= 7:
+                axis_p2 = 6
 
 def main():
     screen_text(intro_message)
     screen_rotation() 
     utime.sleep(1)
+    display.fill(0)
+    display.show()
+    pong()
+    preset("cross")
+    utime.sleep(1)
     screensaver()
+
 
 
 if __name__ == "__main__":
