@@ -1,6 +1,0 @@
-{
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}",
-    "C:\\Users\\esper\\AppData\\Roaming\\Python\\Python314\\site-packages"
-  ]
-}
