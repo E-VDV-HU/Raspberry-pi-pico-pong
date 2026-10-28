@@ -20,6 +20,7 @@ Button configuration:
 #import 
 from machine import Pin, SPI # pyright: ignore[reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingModuleSource]
+import random
 led = Pin("LED", Pin.OUT)
 led.toggle()
 try:
@@ -96,18 +97,62 @@ def preset(var):
             [1, 1, 1, 0, 0, 1, 1, 1],
             [1, 1, 0, 0, 0, 0, 1, 1]
         ]
+    # Up
     elif var == "arrow" or var == "arrow_u":
         display.fill(0)
         matrix_LIST = [
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 1, 0],
-            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
             [0, 0, 1, 1, 1, 1, 0, 0],
             [0, 1, 1, 1, 1, 1, 1, 0],
-            [1, 1, 1, 0, 0, 1, 1, 1],
-            [1, 1, 0, 0, 0, 0, 1, 1]
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0]
         ]
+
+    # Down
+    elif var == "arrow_d":
+        display.fill(0)
+        matrix_LIST = [
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0]
+        ]
+
+    # Left
+    elif var == "arrow_l":
+        display.fill(0)
+        matrix_LIST = [
+            [0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 1, 1, 0, 0, 0, 0],
+            [0, 1, 1, 1, 0, 0, 0, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 0, 0, 0, 0],
+            [0, 0, 1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0]
+        ]
+
+    # Right
+    elif var == "arrow_r":
+        display.fill(0)
+        matrix_LIST = [
+            [0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 1, 1, 0, 0],
+            [0, 0, 0, 0, 1, 1, 1, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 1, 1, 1, 0],
+            [0, 0, 0, 0, 1, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0]
+        ]
+        
     else:
         for i in range(10):
             led.toggle()
@@ -186,22 +231,106 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
         for i in range(axis - 1, axis + 2):
             display.pixel(7,i,1)
 
-def draw_ball(side, curve, axis_ball):
-    for x in range(1,7):
-        for y in range(1,7):
-            display.pixel(x,y,0)
-    if side == "L":
-    
+def draw_ball(side, curve, axis_ball, count):
+    global axis_p1
+    global axis_p2
+    if count <=10:
+        return side, curve, axis_ball, count + 1
+    else:
+        count = 0
+        for x in range(1,7):
+            for y in range(1,7):
+                display.pixel(x,y,0)
+        if side == "L":
+            axis_ball[0] -= 1
+        elif side == "R":
+            axis_ball[0] += 1
+        axis_ball[1] += curve
+
+        if axis_ball[0] == 0:
+            if axis_ball[1] == 0 and axis_p1 == 1:
+                hit = True
+            elif axis_ball[1] == 1 and axis_p1 in range(1,3):
+                hit = True
+            elif axis_ball[1] == 2 and axis_p1 in range(1,4):
+                hit = True
+            elif axis_ball[1] == 3 and axis_p1 in range(2,5):
+                hit = True
+            elif axis_ball[1] == 4 and axis_p1 in range(3,6):
+                hit = True
+            elif axis_ball[1] == 5 and axis_p1 in range(4,7):
+                hit = True
+            elif axis_ball[1] == 6 and axis_p1 in range(5,7):
+                hit = True
+            elif axis_ball[1] == 7 and axis_p1 == 6:
+                hit = True
+            else:
+                hit = False
+
+            if hit:
+                if side == "R":
+                    side = "L"
+                elif side == "L":
+                    side = "R"
+                    curve = -abs(curve)
+            else:
+                global score, reset
+                score[1] += 1 #global reset var en dan reset ball force en show text score.
+                reset = True
+        
+        elif axis_ball[0] == 7:
+            if axis_ball[1] == 0 and axis_p2 == 1:
+                hit = True
+            elif axis_ball[1] == 1 and axis_p2 in range(1,3):
+                hit = True
+            elif axis_ball[1] == 2 and axis_p2 in range(1,4):
+                hit = True
+            elif axis_ball[1] == 3 and axis_p2 in range(2,5):
+                hit = True
+            elif axis_ball[1] == 4 and axis_p2 in range(3,6):
+                hit = True
+            elif axis_ball[1] == 5 and axis_p2 in range(4,7):
+                hit = True
+            elif axis_ball[1] == 6 and axis_p2 in range(5,7):
+                hit = True
+            elif axis_ball[1] == 7 and axis_p2 == 6:
+                hit = True
+            else:
+                hit = False
+        
+            if hit:
+                if side == "R":
+                    side = "L"
+                elif side == "L":
+                    side = "R"
+                curve = -abs(curve)
+            elif:
+                global score, reset
+                score[0] += 1 #global reset var en dan reset ball force en show text score.
+                reset = True
+
             
 def pong():
     axis_p1 = 4
     axis_p2 = 3
-    axis_ball = [5,6]
-    side_ball = "L"
+    axis_ball = [5,6] # default
+    side_ball = "L" #L or R
     curve_ball = 1
+    score = [0,0] # [player 1,player2]
+    reset = False
     while True:
+        if reset:
+            reset = False
+            screen_text(f"{score[0]}-{score[1]}")
+            curve_ball = 1 if random.randint(0, 1) else -1 # Noosphere-chat recommendation (https://noosphere-chat.pages.dev/)
+            axis_ball = [5,6]
+            axis_p1 = 4
+            axis_p2 = 3
+            side_ball = "L"
+
         draw_paddle(1,axis_p1)
         draw_paddle(2,axis_p2)
+        side_ball, curve_ball, axis_ball, count = draw_ball(side_ball, curve_ball, axis_ball, count)
         display.show()
         utime.sleep(0.1)
         if switch_pin1() and switch_pin2():
