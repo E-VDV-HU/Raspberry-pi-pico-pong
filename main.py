@@ -33,6 +33,7 @@ except:
 #vars
 brightness = 10 #between 0 and 15
 switch_pin1 = 14
+switch_pin2 = 15
 intro_message = "SEGA"
 
 # vars check
@@ -46,6 +47,7 @@ if brightness < 0 or brightness >15:
 spi = SPI(0,baudrate=10_000_000,polarity=1,phase=0,sck=Pin(2),mosi=Pin(3))
 ss = Pin(5, Pin.OUT)
 switch_pin1 = Pin(switch_pin1, Pin.IN, pull=Pin.PULL_DOWN)
+switch_pin2 = Pin(switch_pin2, Pin.IN, pull=Pin.PULL_DOWN)
 display = max7219.Matrix8x8(spi, ss, 1)
 
 display.brightness(brightness)
@@ -88,6 +90,9 @@ def preset(var):
             [1, 1, 0, 0, 0, 0, 1, 1]
         ]
     else:
+        for i in range(10):
+            led.toggle()
+            utime.sleep(0.1)
         raise ValueError(f"{var} is not found!")
     
     display.write_matrix(matrix_LIST)
@@ -142,17 +147,17 @@ def screen_rotation():
             display.show()
             utime.sleep(0.25)
             display.pixel(4, 4, 0)
-            display.show()
             utime.sleep(0.25)
+            display.show()
             if switch_pin1.value():
+                preset("checkmark")
                 return f"selected rotation: {display.rotation}" 
             display.fill(0)
             display.show()
 
 def main():
     screen_text(intro_message)
-    screen_rotation()
-    preset("checkmark")
+    screen_rotation() 
     utime.sleep(1)
     screensaver()
 
