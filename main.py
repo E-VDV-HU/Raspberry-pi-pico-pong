@@ -22,7 +22,7 @@ from machine import Pin, SPI # pyright: ignore[reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingModuleSource]
 import random
 led = Pin("LED", Pin.OUT)
-led.toggle()
+led.on()
 try:
     import max7219
 except:
@@ -44,6 +44,9 @@ switch_pin4 = 13
 intro_message = "SEGA"
 
 #pong
+difficulty = 5
+modifier = 1
+#pong defaults
 axis_p1 = 4
 axis_p2 = 3
 axis_ball = [5,6] # default
@@ -171,7 +174,7 @@ def preset(var):
     
     display.write_matrix(matrix_LIST)
     display.show()
-    return "code 0"
+    pass
 
 def screen_text(text):
     length = len(text)
@@ -242,10 +245,10 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
             display.pixel(7,i,1)
 
 def draw_ball(side, curve, axis_ball, count):
-    global axis_p1, axis_p2, score, reset
-    if count <=5:
+    global axis_p1, axis_p2, score, reset, difficulty, modifier
+    if count <= difficulty:
         display.pixel(axis_ball[0],axis_ball[1],1)
-        return side, curve, axis_ball, count + 1
+        return side, curve, axis_ball, count + modifier
     else:
         count = 0
         for x in range(1,7):
@@ -261,66 +264,36 @@ def draw_ball(side, curve, axis_ball, count):
         elif axis_ball[1] > 7:
             axis_ball[1] = 7
 
-        if axis_ball[0] == 0:
-            if axis_ball[1] == 0 and axis_p1 == 1:
-                hit = True
-            elif axis_ball[1] == 1 and axis_p1 in range(1,3):
-                hit = True
-            elif axis_ball[1] == 2 and axis_p1 in range(1,4):
-                hit = True
-            elif axis_ball[1] == 3 and axis_p1 in range(2,5):
-                hit = True
-            elif axis_ball[1] == 4 and axis_p1 in range(3,6):
-                hit = True
-            elif axis_ball[1] == 5 and axis_p1 in range(4,7):
-                hit = True
-            elif axis_ball[1] == 6 and axis_p1 in range(5,7):
-                hit = True
-            elif axis_ball[1] == 7 and axis_p1 == 6:
-                hit = True
+        if axis_ball[0] == 1 and side == "L": 
+            hit = abs(axis_ball[1] - axis_p1) <= 1
+            
+            if hit:
+                if side == "L":
+                    side = "R"
+                else:
+                    side = "L"
             else:
-                hit = False
+                if axis_ball[0] <= 1:
+                    score[1] += 1
+                if axis_ball[0] >= 6:
+                    score[0] += 1
+                reset = True
+        
+        elif axis_ball[0] == 6 and side == "R":
+            hit = abs(axis_ball[1] - axis_p2) <= 1
+            
+            if hit:
+                if side == "L":
+                    side = "R"
+                else:
+                    side = "L"
+            else:
+                if axis_ball[0] <= 1:
+                    score[1] += 1
+                if axis_ball[0] >= 6:
+                    score[0] += 1
+                reset = True
 
-            if hit:
-                if side == "R":
-                    side = "L"
-                elif side == "L":
-                    side = "R"
-                    curve = curve
-            else:
-                score[1] += 1 #global reset var en dan reset ball force en show text score.
-                reset = True
-        
-        
-        elif axis_ball[0] == 7:
-            if axis_ball[1] == 0 and axis_p2 == 1:
-                hit = True
-            elif axis_ball[1] == 1 and axis_p2 in range(1,3):
-                hit = True
-            elif axis_ball[1] == 2 and axis_p2 in range(1,4):
-                hit = True
-            elif axis_ball[1] == 3 and axis_p2 in range(2,5):
-                hit = True
-            elif axis_ball[1] == 4 and axis_p2 in range(3,6):
-                hit = True
-            elif axis_ball[1] == 5 and axis_p2 in range(4,7):
-                hit = True
-            elif axis_ball[1] == 6 and axis_p2 in range(5,7):
-                hit = True
-            elif axis_ball[1] == 7 and axis_p2 == 6:
-                hit = True
-            else:
-                hit = False
-        
-            if hit:
-                if side == "R":
-                    side = "L"
-                elif side == "L":
-                    side = "R"
-                curve = -(curve)
-            else:
-                score[0] += 1 #global reset var en dan reset ball force en show text score.
-                reset = True
     display.pixel(axis_ball[0],axis_ball[1],1)
     if axis_ball[1] == 0 or axis_ball[1] == 7:
         curve = -(curve)
@@ -328,7 +301,7 @@ def draw_ball(side, curve, axis_ball, count):
 
             
 def pong():
-    global axis_p1,axis_p2,axis_ball,side_ball,curve_ball,score,reset,count
+    global axis_p1,axis_p2,axis_ball,side_ball,curve_ball,score,reset,count, modifier, difficulty
     while True:
         display.fill(0)
         if reset:
@@ -387,6 +360,7 @@ def main():
     utime.sleep(1)
     display.fill(0)
     display.show
+    utime.sleep(1)
 
 
 if __name__ == "__main__":
