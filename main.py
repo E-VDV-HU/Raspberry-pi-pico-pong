@@ -243,7 +243,8 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
 
 def draw_ball(side, curve, axis_ball, count):
     global axis_p1, axis_p2, score, reset
-    if count <=10:
+    if count <=5:
+        display.pixel(axis_ball[0],axis_ball[1],1)
         return side, curve, axis_ball, count + 1
     else:
         count = 0
@@ -255,6 +256,10 @@ def draw_ball(side, curve, axis_ball, count):
         elif side == "R":
             axis_ball[0] += 1
         axis_ball[1] += curve
+        if axis_ball[1] < 0:
+            axis_ball[1] = 0
+        elif axis_ball[1] > 7:
+            axis_ball[1] = 7
 
         if axis_ball[0] == 0:
             if axis_ball[1] == 0 and axis_p1 == 1:
@@ -281,9 +286,8 @@ def draw_ball(side, curve, axis_ball, count):
                     side = "L"
                 elif side == "L":
                     side = "R"
-                    curve = -(curve)
+                    curve = curve
             else:
-                global score, reset
                 score[1] += 1 #global reset var en dan reset ball force en show text score.
                 reset = True
         
@@ -315,7 +319,6 @@ def draw_ball(side, curve, axis_ball, count):
                     side = "R"
                 curve = -(curve)
             else:
-                global score, reset
                 score[0] += 1 #global reset var en dan reset ball force en show text score.
                 reset = True
     display.pixel(axis_ball[0],axis_ball[1],1)
