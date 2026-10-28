@@ -9,8 +9,8 @@ Connections: MAX7219 LED Matrix to Raspberry Pi Pico W
 
 Connections: Push Button 1
 
- * One side      -> 3V3 OUT (physical pin 36)
- * Opposite side -> GP14 (GPIO19, physical pin 25)
+ * One side      -> 3V3 OUT (physical pin 36) [note] cannot be changed
+ * Opposite side -> GP14 (GPIO19, physical pin 19) [note] this can be easily changes using vars
 
 Button configuration:
  * GP19 uses an internal pull-down resistor.
@@ -28,7 +28,7 @@ except:
     for i in range(11):
         led.toggle()
         utime.sleep(0.1)
-    raise ValueError("Library max7219 is not installed.")
+    raise ImportError("Library max7219 is not installed.")
 
 #vars
 brightness = 10 #between 0 and 15
@@ -88,7 +88,7 @@ def preset(var):
             [1, 1, 0, 0, 0, 0, 1, 1]
         ]
     else:
-        return ValueError(f"{var} is not found!")
+        raise ValueError(f"{var} is not found!")
     
     display.write_matrix(matrix_LIST)
     display.show()
@@ -117,33 +117,41 @@ def screensaver():
                     return "code 0"
 
 def screen_rotation():
-    global switch_pin1
     while True:
         display.fill(0)
         display.pixel(3, 0, 1)
         display.pixel(4, 0, 1)
         display.show()
         if switch_pin1.value():
-            display.rotation = display.rotation + 90
-            if display.rotation >= 360:
-                display.rotation = 0
+            while switch_pin1.value():
+                utime.sleep(0.1)
             display.pixel(3, 3, 1)
             display.pixel(4, 3, 1)
             display.pixel(3, 4, 1)
             display.pixel(4, 4, 1)
+            rotation = (display.rotation + 90) % 360
+            display.set_rotation(rotation)
             display.show()
-            utime.sleep(1)
-            if switch_pin1.value():
-                return f"selected rotation: {display.rotation}"
             display.pixel(3, 3, 0)
+            display.show()
+            utime.sleep(0.25)
             display.pixel(4, 3, 0)
+            display.show()
+            utime.sleep(0.25)
             display.pixel(3, 4, 0)
+            display.show()
+            utime.sleep(0.25)
             display.pixel(4, 4, 0)
+            display.show()
+            utime.sleep(0.25)
+            if switch_pin1.value():
+                return f"selected rotation: {display.rotation}" 
+            display.fill(0)
             display.show()
 
 def main():
     screen_text(intro_message)
-    print(screen_rotation())
+    screen_rotation()
     preset("checkmark")
     utime.sleep(1)
     screensaver()
