@@ -1,6 +1,9 @@
 #keypad voltages
 
 ## one board
+**base**
+65535
+
 **up**
 9200-9522
 
@@ -18,4 +21,24 @@
 
 default = 65535
 
-##two boards
+## two boards
+
+> note: this seems to be a malfunction with my board.
+
+**base**
+0-1000
+
+**up**
+55600-57000
+
+**down**
+44300-4599
+
+**left**
+65400-65535
+
+**right**
+33300-33900
+
+**action-button**
+17800-18700
