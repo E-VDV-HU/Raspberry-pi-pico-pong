@@ -18,8 +18,8 @@ Button configuration:
  * Pressed: reads 1
 """
 #import 
-from machine import Pin, SPI # pyright: ignore[reportMissingModuleSource]
-import utime # pyright: ignore[reportMissingModuleSource]
+from machine import Pin, SPI # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+import utime # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import random
 led = Pin("LED", Pin.OUT)
 led.on()
@@ -32,7 +32,7 @@ except:
     raise ImportError("Library max7219 is not installed.")
 
 #vars
-brightness = 10 #between 0 and 15
+brightness = 15 #between 0 and 15
 
 #player 1 / main controller
 switch_pin1 = 14
@@ -44,7 +44,7 @@ switch_pin4 = 13
 intro_message = "SEGA"
 
 #pong
-difficulty = 5
+difficulty = 3
 modifier = 1
 #pong defaults
 axis_p1 = 4
@@ -268,6 +268,11 @@ def draw_ball(side, curve, axis_ball, count):
             hit = abs(axis_ball[1] - axis_p1) <= 1
             
             if hit:
+                offset = axis_ball[1] - axis_p1
+                if abs(offset) == 1:
+                    curve = 2 if offset > 0 else -2
+                else:
+                    curve = -1
                 if side == "L":
                     side = "R"
                 else:
@@ -281,8 +286,14 @@ def draw_ball(side, curve, axis_ball, count):
         
         elif axis_ball[0] == 6 and side == "R":
             hit = abs(axis_ball[1] - axis_p2) <= 1
-            
+            offset = axis_ball[1] - axis_p2
             if hit:
+                offset = axis_ball[1] - axis_p2
+                if abs(offset) == 1:
+                    curve = 2 if offset > 0 else -2
+                else:
+                    curve = -1
+                
                 if side == "L":
                     side = "R"
                 else:
@@ -295,8 +306,12 @@ def draw_ball(side, curve, axis_ball, count):
                 reset = True
 
     display.pixel(axis_ball[0],axis_ball[1],1)
-    if axis_ball[1] == 0 or axis_ball[1] == 7:
+    if axis_ball[1] <= 0 or axis_ball[1] >= 7:
         curve = -(curve)
+    if axis_ball[1] < 0:
+        axis_ball[1] = 0
+    elif axis_ball[1] > 7:
+        axis_ball[1] = 7
     return side,curve,axis_ball,count
 
             
