@@ -7,18 +7,22 @@ Connections: MAX7219 LED Matrix to Raspberry Pi Pico W
  * CS  -> GPIO5 (physical pin 7)
  * CLK -> GPIO2 (physical pin 4)
 
-Connections: Push Button 1
+Connections: Analog Keypad 1
+ * VCC    -> 3V3 OUT (physical pin 36)
+ * GND    -> GND
+ * Signal -> GP26 (ADC0, physical pin 31)
 
- * One side      -> 3V3 OUT (physical pin 36) [note] cannot be changed
- * Opposite side -> GP14 (GPIO19, physical pin 19) [note] this can be easily changes using vars
+Connections: Analog Keypad 2
+ * VCC    -> 3V3 OUT (physical pin 36)
+ * GND    -> GND
+ * Signal -> GP27 (ADC1, physical pin 32)
 
-Button configuration:
- * GP19 uses an internal pull-down resistor.
- * Released: reads 0
- * Pressed: reads 1
+Keypad configuration:
+ * Each button has its own ADC value.
+ * Released: reads approximately 65535
 """
-#import 
-from machine import Pin, SPI # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+#import
+from machine import Pin, SPI, ADC  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import random
 led = Pin("LED", Pin.OUT)
@@ -33,19 +37,14 @@ except:
 
 #vars
 brightness = 15 #between 0 and 15
-
-#player 1 / main controller
-switch_pin1 = 14
-switch_pin2 = 15
-
-#player 2
-switch_pin3 = 12
-switch_pin4 = 13
+keypad_pin1 = 26  # GP26 / ADC0, physical pin 31
+keypad_pin2 = 27  # GP27 / ADC1, physical pin 32
 intro_message = "SEGA"
 
 #pong
 difficulty = 3
 modifier = 1
+
 #pong defaults
 axis_p1 = 4
 axis_p2 = 3
@@ -66,14 +65,12 @@ if brightness < 0 or brightness >15:
 # autoconfig
 spi = SPI(0,baudrate=10_000_000,polarity=1,phase=0,sck=Pin(2),mosi=Pin(3))
 ss = Pin(5, Pin.OUT)
-switch_pin1 = Pin(switch_pin1, Pin.IN, pull=Pin.PULL_DOWN)
-switch_pin2 = Pin(switch_pin2, Pin.IN, pull=Pin.PULL_DOWN)
-switch_pin3 = Pin(switch_pin3, Pin.IN, pull=Pin.PULL_DOWN)
-switch_pin4 = Pin(switch_pin4, Pin.IN, pull=Pin.PULL_DOWN)
+keypad_1 = ADC(Pin(keypad_pin1))
+keypad_2 = ADC(Pin(keypad_pin2))
 display = max7219.Matrix8x8(spi, ss, 1)
-
 display.brightness(brightness)
 display.set_rotation(270)  # Default @ 270
+
 # Clear the display.
 display.fill(0)
 display.show()
@@ -165,16 +162,29 @@ def preset(var):
             [0, 0, 0, 0, 1, 1, 0, 0],
             [0, 0, 0, 0, 1, 0, 0, 0]
         ]
-        
+
     else:
         for i in range(10):
             led.toggle()
             utime.sleep(0.1)
         raise ValueError(f"{var} is not found!")
-    
+
     display.write_matrix(matrix_LIST)
     display.show()
-    pass
+
+def read_keypad(keypad):
+    value = keypad.read_u16()
+    if 9200 <= value <= 9522:
+        return "UP"
+    elif 21300 <= value <= 21452:
+        return "DOWN"
+    elif 140 <= value <= 280:
+        return "LEFT"
+    elif 32500 <= value <= 32647:
+        return "RIGHT"
+    elif 47690 <= value <= 47800:
+        return "ACTION"
+    return None
 
 def screen_text(text):
     length = len(text)
@@ -195,7 +205,7 @@ def screensaver():
                 display.pixel(x,y,1)
                 display.show()
                 utime.sleep(0.1)
-                if switch_pin1.value():
+                if read_keypad(keypad_1) == "ACTION":
                     return "code 0"
 
 def screen_rotation():
@@ -204,8 +214,8 @@ def screen_rotation():
         display.pixel(3, 0, 1)
         display.pixel(4, 0, 1)
         display.show()
-        if switch_pin1.value():
-            while switch_pin1.value():
+        if read_keypad(keypad_1) == "ACTION":
+            while read_keypad(keypad_1) == "ACTION":
                 utime.sleep(0.1)
             display.pixel(3, 3, 1)
             display.pixel(4, 3, 1)
@@ -226,9 +236,9 @@ def screen_rotation():
             display.pixel(4, 4, 0)
             utime.sleep(0.25)
             display.show()
-            if switch_pin1.value():
+            if read_keypad(keypad_1) == "ACTION":
                 preset("checkmark")
-                return f"selected rotation: {display.rotation}" 
+                return f"selected rotation: {display.rotation}"
             display.fill(0)
             display.show()
 
@@ -264,9 +274,8 @@ def draw_ball(side, curve, axis_ball, count):
         elif axis_ball[1] > 7:
             axis_ball[1] = 7
 
-        if axis_ball[0] == 1 and side == "L": 
+        if axis_ball[0] == 1 and side == "L":
             hit = abs(axis_ball[1] - axis_p1) <= 1
-            
             if hit:
                 offset = axis_ball[1] - axis_p1
                 if abs(offset) == 1:
@@ -283,7 +292,7 @@ def draw_ball(side, curve, axis_ball, count):
                 if axis_ball[0] >= 6:
                     score[0] += 1
                 reset = True
-        
+
         elif axis_ball[0] == 6 and side == "R":
             hit = abs(axis_ball[1] - axis_p2) <= 1
             offset = axis_ball[1] - axis_p2
@@ -293,7 +302,6 @@ def draw_ball(side, curve, axis_ball, count):
                     curve = 2 if offset > 0 else -2
                 else:
                     curve = -1
-                
                 if side == "L":
                     side = "R"
                 else:
@@ -314,7 +322,6 @@ def draw_ball(side, curve, axis_ball, count):
         axis_ball[1] = 7
     return side,curve,axis_ball,count
 
-            
 def pong():
     global axis_p1,axis_p2,axis_ball,side_ball,curve_ball,score,reset,count, modifier, difficulty
     while True:
@@ -327,43 +334,43 @@ def pong():
             axis_p1 = 4
             axis_p2 = 3
             side_ball = "L"
+            count = 0
 
         draw_paddle(1,axis_p1)
         draw_paddle(2,axis_p2)
         side_ball, curve_ball, axis_ball, count = draw_ball(side_ball, curve_ball, axis_ball, count)
         display.show()
         utime.sleep(0.1)
-        if switch_pin1.value() and switch_pin2.value():
+
+        key1 = read_keypad(keypad_1)
+        key2 = read_keypad(keypad_2)
+
+        if key1 == "ACTION":
             break
-        elif switch_pin1.value():
+        elif key1 == "UP":
             axis_p1 -= 1
-            if axis_p1 <= 0:
-                axis_p1 = 1
-            elif axis_p1 >= 7:
-                axis_p1 = 6
-        elif switch_pin2.value():
+        elif key1 == "DOWN":
             axis_p1 += 1
-            if axis_p1 <= 0:
-                axis_p1 = 1
-            elif axis_p1 >= 7:
-                axis_p1 = 6
-        if switch_pin3.value():
+
+        if key2 == "UP":
             axis_p2 -= 1
-            if axis_p2 <= 0:
-                axis_p2 = 1
-            elif axis_p2 >= 7:
-                axis_p2 = 6
-        elif switch_pin4.value():
+        elif key2 == "DOWN":
             axis_p2 += 1
-            if axis_p2 <= 0:
-                axis_p2 = 1
-            elif axis_p2 >= 7:
-                axis_p2 = 6
+
+        if axis_p1 <= 0:
+            axis_p1 = 1
+        elif axis_p1 >= 7:
+            axis_p1 = 6
+
+        if axis_p2 <= 0:
+            axis_p2 = 1
+        elif axis_p2 >= 7:
+            axis_p2 = 6
     display.show()
 
 def main():
     screen_text(intro_message)
-    screen_rotation() 
+    screen_rotation()
     utime.sleep(1)
     display.fill(0)
     display.show()
@@ -374,9 +381,8 @@ def main():
     preset("cross")
     utime.sleep(1)
     display.fill(0)
-    display.show
+    display.show()
     utime.sleep(1)
-
 
 if __name__ == "__main__":
     main()
