@@ -62,7 +62,7 @@ oled_pin_SDA = 6
 #pong
 difficulty = 3
 modifier = 1
-bot = "R" # L, R, Both or None
+bot = "Both" # L, R, Both or None
 
 #pong defaults
 axis_p1 = 4
