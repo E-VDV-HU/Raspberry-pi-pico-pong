@@ -7,6 +7,12 @@ Connections: MAX7219 LED Matrix to Raspberry Pi Pico W
  * CS  -> GPIO5 (physical pin 7)
  * CLK -> GPIO2 (physical pin 4)
 
+Connections: OLED SSD1306 I2C Display
+ * VCC -> 3V3 OUT (physical pin 36)
+ * GND -> GND (physical pin 38)
+ * SCL -> GPIO7 (physical pin 10)
+ * SDA -> GPIO6 (physical pin 9)
+
 Connections: Analog Keypad 1
  * VCC    -> 3V3 OUT (physical pin 36)
  * GND    -> GND
@@ -16,17 +22,15 @@ Connections: Analog Keypad 2
  * VCC    -> 3V3 OUT (physical pin 36)
  * GND    -> GND
  * Signal -> GP27 (ADC1, physical pin 32)
-
-Keypad configuration:
- * Each button has its own ADC value.
- * Released: reads approximately 65535
 """
 #import
-from machine import Pin, SPI, ADC  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from machine import Pin, SPI, ADC, SoftI2C  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import random
+
 led = Pin("LED", Pin.OUT)
 led.on()
+
 try:
     import max7219
 except:
@@ -35,16 +39,30 @@ except:
         utime.sleep(0.1)
     raise ImportError("Library max7219 is not installed.")
 
+try:
+    from ssd1306 import SSD1306_I2C
+except:
+    for i in range(5):
+        led.toggle()
+        utime.sleep(1)
+    raise ImportError("Library ssd1306 is not installed.")
+
 #vars
-brightness = 15 #between 0 and 15
+brightness = 10 #between 0 and 15
 keypad_pin1 = 26  # GP26 / ADC0, physical pin 31
 keypad_pin2 = 27  # GP27 / ADC1, physical pin 32
 intro_message = "SEGA"
 
+#oled
+WIDTH = 128
+HEIGHT = 64
+oled_pin_SCL = 7
+oled_pin_SDA = 6
+
 #pong
 difficulty = 3
 modifier = 1
-bot = "L" # L, R or None
+bot = "R" # L, R, Both or None
 
 #pong defaults
 axis_p1 = 4
@@ -57,24 +75,31 @@ reset = False
 count = 0
 
 # vars check
-if brightness < 0 or brightness >15:
+if brightness < 0 or brightness > 15:
     for i in range(6):
         led.toggle()
         utime.sleep(0.5)
-    raise ValueError("Brightness must been 0 and 15") #should exit
+    raise ValueError("Brightness must be between 0 and 15")
+
+if bot not in ("L", "R", "Both", None):
+    raise ValueError('bot must be "L", "R", "Both" or None')
 
 # autoconfig
-spi = SPI(0,baudrate=10_000_000,polarity=1,phase=0,sck=Pin(2),mosi=Pin(3))
+spi = SPI(0, baudrate=10_000_000, polarity=1, phase=0, sck=Pin(2), mosi=Pin(3))
 ss = Pin(5, Pin.OUT)
 keypad_1 = ADC(Pin(keypad_pin1))
 keypad_2 = ADC(Pin(keypad_pin2))
 display = max7219.Matrix8x8(spi, ss, 1)
 display.brightness(brightness)
 display.set_rotation(270)  # Default @ 270
+i2c = SoftI2C(scl=Pin(oled_pin_SCL), sda=Pin(oled_pin_SDA))
+oled = SSD1306_I2C(WIDTH, HEIGHT, i2c)
 
 # Clear the display.
 display.fill(0)
 display.show()
+oled.fill(0)
+oled.show()
 
 #confirm clean setup
 led.toggle()
@@ -163,7 +188,6 @@ def preset(var):
             [0, 0, 0, 0, 1, 1, 0, 0],
             [0, 0, 0, 0, 1, 0, 0, 0]
         ]
-
     else:
         for i in range(10):
             led.toggle()
@@ -189,21 +213,19 @@ def read_keypad(keypad):
 
 def screen_text(text):
     length = len(text)
-    column = (length * 8)
-    while True:
-        for i in range(32, -column, -1):
-            display.fill(0)
-            display.text(text, i, 0, 1)
-            display.show()
-            utime.sleep(0.1)
-        break
+    column = length * 8
+    for i in range(32, -column, -1):
+        display.fill(0)
+        display.text(text, i, 0, 1)
+        display.show()
+        utime.sleep(0.1)
 
 def screensaver():
     while True:
         for x in range(8):
             for y in range(8):
                 display.fill(0)
-                display.pixel(x,y,1)
+                display.pixel(x, y, 1)
                 display.show()
                 utime.sleep(0.1)
                 if read_keypad(keypad_1) == "ACTION":
@@ -246,29 +268,31 @@ def screen_rotation():
 def draw_paddle(player, axis): # display.pixel (x, y, on_off)
     if player == 1:
         for i in range(8):
-            display.pixel(0,i,0)
+            display.pixel(0, i, 0)
         for i in range(axis - 1, axis + 2):
-            display.pixel(0,i,1)
+            display.pixel(0, i, 1)
     elif player == 2:
         for i in range(8):
-            display.pixel(7,i,0)
+            display.pixel(7, i, 0)
         for i in range(axis - 1, axis + 2):
-            display.pixel(7,i,1)
+            display.pixel(7, i, 1)
 
 def draw_ball(side, curve, axis_ball, count):
     global axis_p1, axis_p2, score, reset, difficulty, modifier, bot
     if count <= difficulty:
-        display.pixel(axis_ball[0],axis_ball[1],1)
+        display.pixel(axis_ball[0], axis_ball[1], 1)
         return side, curve, axis_ball, count + modifier
     else:
         count = 0
-        for x in range(1,7):
-            for y in range(0,8):
-                display.pixel(x,y,0)
+        for x in range(1, 7):
+            for y in range(0, 8):
+                display.pixel(x, y, 0)
+
         if side == "L":
             axis_ball[0] -= 1
         elif side == "R":
             axis_ball[0] += 1
+
         axis_ball[1] += curve
         if axis_ball[1] < 0:
             axis_ball[1] = 0
@@ -276,7 +300,7 @@ def draw_ball(side, curve, axis_ball, count):
             axis_ball[1] = 7
 
         if axis_ball[0] == 1 and side == "L":
-            if bot == "L":
+            if bot == "L" or bot == "Both":
                 side = "R"
             else:
                 hit = abs(axis_ball[1] - axis_p1) <= 1
@@ -286,61 +310,58 @@ def draw_ball(side, curve, axis_ball, count):
                         curve = 2 if offset > 0 else -2
                     else:
                         curve = -1
-                    if side == "L":
-                        side = "R"
-                    else:
-                        side = "L"
+                    side = "R"
                 else:
-                    if axis_ball[0] <= 1:
-                        score[1] += 1
-                    if axis_ball[0] >= 6:
-                        score[0] += 1
+                    score[1] += 1
                     reset = True
 
         elif axis_ball[0] == 6 and side == "R":
-            hit = abs(axis_ball[1] - axis_p2) <= 1
-            if hit:
-                offset = axis_ball[1] - axis_p2
-                if abs(offset) == 1:
-                    curve = 2 if offset > 0 else -2
-                else:
-                    curve = -1
-                if side == "L":
-                    side = "R"
-                else:
-                    side = "L"
+            if bot == "R" or bot == "Both":
+                side = "L"
             else:
-                if axis_ball[0] <= 1:
-                    score[1] += 1
-                if axis_ball[0] >= 6:
+                hit = abs(axis_ball[1] - axis_p2) <= 1
+                if hit:
+                    offset = axis_ball[1] - axis_p2
+                    if abs(offset) == 1:
+                        curve = 2 if offset > 0 else -2
+                    else:
+                        curve = -1
+                    side = "L"
+                else:
                     score[0] += 1
-                reset = True
+                    reset = True
 
-    display.pixel(axis_ball[0],axis_ball[1],1)
+    display.pixel(axis_ball[0], axis_ball[1], 1)
     if axis_ball[1] <= 0 or axis_ball[1] >= 7:
         curve = -(curve)
     if axis_ball[1] < 0:
         axis_ball[1] = 0
     elif axis_ball[1] > 7:
         axis_ball[1] = 7
-    return side,curve,axis_ball,count
+    return side, curve, axis_ball, count
 
 def pong():
-    global axis_p1,axis_p2,axis_ball,side_ball,curve_ball,score,reset,count, modifier, difficulty
+    global axis_p1, axis_p2, axis_ball, side_ball, curve_ball, score, reset, count, modifier, difficulty
+    oled.fill(0)
+    oled.text("0-0", 0, 0)
+    oled.show()
     while True:
         display.fill(0)
         if reset:
             reset = False
+            oled.fill(0)
+            oled.text(f"{score[0]}-{score[1]}", 0, 0)
+            oled.show()
             screen_text(f"{score[0]}-{score[1]}")
             curve_ball = 1 if random.randint(0, 1) else -1 # Noosphere-chat recommendation (https://noosphere-chat.pages.dev/)
-            axis_ball = [5,6]
+            axis_ball = [5, 6]
             axis_p1 = 4
             axis_p2 = 3
             side_ball = "L"
             count = 0
 
-        draw_paddle(1,axis_p1)
-        draw_paddle(2,axis_p2)
+        draw_paddle(1, axis_p1)
+        draw_paddle(2, axis_p2)
         side_ball, curve_ball, axis_ball, count = draw_ball(side_ball, curve_ball, axis_ball, count)
         display.show()
         utime.sleep(0.1)
@@ -369,9 +390,14 @@ def pong():
             axis_p2 = 1
         elif axis_p2 >= 7:
             axis_p2 = 6
-    display.show()
+
+    oled.fill(0)
+    oled.show()
 
 def main():
+    oled.fill(0)
+    oled.text("Welcome!", 0, 0)
+    oled.show()
     screen_text(intro_message)
     screen_rotation()
     utime.sleep(1)
