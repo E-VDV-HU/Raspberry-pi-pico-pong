@@ -44,6 +44,7 @@ intro_message = "SEGA"
 #pong
 difficulty = 3
 modifier = 1
+bot = "L" # L, R or None
 
 #pong defaults
 axis_p1 = 4
@@ -255,7 +256,7 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
             display.pixel(7,i,1)
 
 def draw_ball(side, curve, axis_ball, count):
-    global axis_p1, axis_p2, score, reset, difficulty, modifier
+    global axis_p1, axis_p2, score, reset, difficulty, modifier, bot
     if count <= difficulty:
         display.pixel(axis_ball[0],axis_ball[1],1)
         return side, curve, axis_ball, count + modifier
@@ -275,27 +276,29 @@ def draw_ball(side, curve, axis_ball, count):
             axis_ball[1] = 7
 
         if axis_ball[0] == 1 and side == "L":
-            hit = abs(axis_ball[1] - axis_p1) <= 1
-            if hit:
-                offset = axis_ball[1] - axis_p1
-                if abs(offset) == 1:
-                    curve = 2 if offset > 0 else -2
-                else:
-                    curve = -1
-                if side == "L":
-                    side = "R"
-                else:
-                    side = "L"
+            if bot == "L":
+                side = "R"
             else:
-                if axis_ball[0] <= 1:
-                    score[1] += 1
-                if axis_ball[0] >= 6:
-                    score[0] += 1
-                reset = True
+                hit = abs(axis_ball[1] - axis_p1) <= 1
+                if hit:
+                    offset = axis_ball[1] - axis_p1
+                    if abs(offset) == 1:
+                        curve = 2 if offset > 0 else -2
+                    else:
+                        curve = -1
+                    if side == "L":
+                        side = "R"
+                    else:
+                        side = "L"
+                else:
+                    if axis_ball[0] <= 1:
+                        score[1] += 1
+                    if axis_ball[0] >= 6:
+                        score[0] += 1
+                    reset = True
 
         elif axis_ball[0] == 6 and side == "R":
             hit = abs(axis_ball[1] - axis_p2) <= 1
-            offset = axis_ball[1] - axis_p2
             if hit:
                 offset = axis_ball[1] - axis_p2
                 if abs(offset) == 1:
