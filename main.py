@@ -65,7 +65,7 @@ oled_pin_SDA = 15
 #pong
 difficulty = 3
 modifier = 1
-bot = "R" # L, R, Both or None
+bot = None # L, R, Both or None
 
 #pong defaults
 axis_p1 = 4
@@ -95,7 +95,6 @@ keypad_1 = ADC(Pin(keypad_pin1))
 keypad_2 = ADC(Pin(keypad_pin2))
 display = max7219.Matrix8x8(spi, ss, 1)
 display.brightness(brightness)
-display.set_rotation(270)  # Default @ 270
 i2c = SoftI2C(scl=Pin(oled_pin_SCL), sda=Pin(oled_pin_SDA))
 oled = SSD1306_I2C(WIDTH, HEIGHT, i2c)
 goal_explosions.setup(display)
@@ -116,6 +115,16 @@ except OSError:
             }
         }, file)
 
+try:
+    with open("display_rotation.json", "r") as file:
+        display_rotation = int(json.load(file))
+except (OSError, ValueError, TypeError):
+    display_rotation = 270
+
+if display_rotation not in (0, 90, 180, 270):
+    display_rotation = 270
+
+display.set_rotation(display_rotation)
 
 with open("stats.json", "r") as file:
     stats = json.load(file)["players"]
@@ -314,44 +323,85 @@ def screensaver():
                     return "code 0"
 
 def screen_rotation():
-    oled.fill(0)
-    oled.text("Press [ACTION]", 0,0)
-    oled.text("to rotate.", 0,16)
-    oled.text("Hold [ACTION]", 0,32)
-    oled.text("after to confirm.",0,48)
-    oled.show()
-    while True:
+    global display_rotation
+
+    rotations = [0, 90, 180, 270]
+    rotation_index = rotations.index(display_rotation)
+
+    def wait_for_release(button):
+        released_since = None
+
+        while True:
+            now = utime.ticks_ms()
+
+            if read_keypad(keypad_1) == button:
+                released_since = None
+            else:
+                if released_since is None:
+                    released_since = now
+                elif utime.ticks_diff(now, released_since) >= 120:
+                    return
+
+            utime.sleep(0.02)
+
+    def render():
+        rotation = rotations[rotation_index]
+        display.set_rotation(rotation)
+
+        oled.fill(0)
+        oled.text("Display rotation", 0, 0)
+        oled.text("{} degrees".format(rotation), 0, 16)
+        oled.text("LEFT/RIGHT: turn", 0, 32)
+        oled.text("ACTION: confirm", 0, 48)
+        oled.show()
+
+        # Original rotation indicator: two dots at the top.
         display.fill(0)
         display.pixel(3, 0, 1)
         display.pixel(4, 0, 1)
         display.show()
-        if read_keypad(keypad_1) == "ACTION":
-            while read_keypad(keypad_1) == "ACTION":
-                utime.sleep(0.1)
-            display.pixel(3, 3, 1)
-            display.pixel(4, 3, 1)
-            display.pixel(3, 4, 1)
-            display.pixel(4, 4, 1)
-            rotation = (display.rotation + 90) % 360
-            display.set_rotation(rotation)
-            display.show()
-            display.pixel(3, 3, 0)
-            display.show()
-            utime.sleep(0.25)
-            display.pixel(4, 3, 0)
-            display.show()
-            utime.sleep(0.25)
-            display.pixel(3, 4, 0)
-            display.show()
-            utime.sleep(0.25)
-            display.pixel(4, 4, 0)
-            utime.sleep(0.25)
-            display.show()
-            if read_keypad(keypad_1) == "ACTION":
-                preset("checkmark")
-                return f"selected rotation: {display.rotation}"
-            display.fill(0)
-            display.show()
+
+    render()
+
+    while True:
+        key = read_keypad(keypad_1)
+
+        if key not in ("LEFT", "RIGHT", "ACTION"):
+            utime.sleep(0.02)
+            continue
+
+        utime.sleep(0.04)
+
+        if read_keypad(keypad_1) != key:
+            continue
+
+        if key == "LEFT":
+            rotation_index = (rotation_index - 1) % 4
+            wait_for_release("LEFT")
+            render()
+
+        elif key == "RIGHT":
+            rotation_index = (rotation_index + 1) % 4
+            wait_for_release("RIGHT")
+            render()
+
+        elif key == "ACTION":
+            wait_for_release("ACTION")
+
+            display_rotation = rotations[rotation_index]
+
+            with open("display_rotation.json", "w") as file:
+                json.dump(display_rotation, file)
+
+            preset("checkmark")
+
+            oled.fill(0)
+            oled.text("Rotation saved!", 0, 0)
+            oled.text("{} degrees".format(display_rotation), 0, 16)
+            oled.show()
+
+            utime.sleep(1)
+            return display_rotation
 
 def draw_paddle(player, axis): # display.pixel (x, y, on_off)
     if player == 1:
@@ -543,7 +593,11 @@ def menu():
                 utime.sleep(1)
             elif page == 2:
                 screen_rotation()
-                utime.sleep(1)
+                oled.fill(0)
+                oled.text("Exiting...", 0, 0)
+                oled.show()
+                utime.sleep(0.5)
+                page_render(page)
             elif page == 3:
                 show_stats()
                 utime.sleep(1)
@@ -563,8 +617,58 @@ def battlepass():
     index = 0
     side = "L"
 
-    def select(name, selected_side):
-        player = "1" if selected_side == "L" else "2"
+    EQUIP_HOLD_MS = 700
+    EXIT_HOLD_MS = 2000
+    RELEASE_GRACE_MS = 220
+    POLL_INTERVAL = 0.02
+
+    def wait_for_release(key):
+        last_seen = utime.ticks_ms()
+
+        while True:
+            now = utime.ticks_ms()
+
+            if read_keypad(keypad_1) == key:
+                last_seen = now
+            elif utime.ticks_diff(now, last_seen) >= RELEASE_GRACE_MS:
+                return
+
+            utime.sleep(POLL_INTERVAL)
+
+    def measure_action():
+        """Measure ACTION duration while tolerating brief ADC fluctuations."""
+        started = utime.ticks_ms()
+        last_seen = started
+
+        while True:
+            now = utime.ticks_ms()
+
+            if read_keypad(keypad_1) == "ACTION":
+                last_seen = now
+
+            elif utime.ticks_diff(now, last_seen) >= RELEASE_GRACE_MS:
+                return utime.ticks_diff(last_seen, started)
+
+            utime.sleep(POLL_INTERVAL)
+
+    def show_menu(message=""):
+        player = "1" if side == "L" else "2"
+        equipped = stats[player]["equipped_explosion"]
+
+        name = names[index]
+        if name == equipped:
+            name = "*" + name
+
+        oled.fill(0)
+        oled.text("{}/{}".format(index + 1, len(names)), 0, 0)
+        oled.text(name[:16], 0, 16)
+        oled.text("Player: " + player, 0, 32)
+        oled.text(message[:16], 0, 48)
+        oled.show()
+
+    def equip_current():
+        player = "1" if side == "L" else "2"
+        name = names[index]
 
         stats[player]["equipped_explosion"] = name
 
@@ -574,62 +678,53 @@ def battlepass():
         preset("checkmark")
 
         oled.fill(0)
-        oled.text("Explosion saved!", 0, 0)
+        oled.text("EQUIPPED!", 0, 0)
         oled.text("Player: " + player, 0, 16)
         oled.text(name[:16], 0, 32)
         oled.show()
 
-        utime.sleep(1)
-
-    def show_menu(message=""):
-        player = "1" if side == "L" else "2"
-
-        oled.fill(0)
-        oled.text("{}/{}".format(index + 1, len(names)), 0, 0)
-        oled.text(names[index][:16], 0, 16)
-        oled.text("Player: " + player, 0, 32)
-        oled.text(message[:16], 0, 48)
-        oled.show()
-
-    show_menu("ACTION=preview")
+    show_menu("Tap=preview")
 
     while True:
-        key1 = read_keypad(keypad_1)
-        key2 = read_keypad(keypad_2)
+        key = read_keypad(keypad_1)
 
-        # Player 2 can exit the Battlepass.
-        if key2 == "ACTION":
-            while read_keypad(keypad_2) == "ACTION":
-                utime.sleep(0.05)
+        if key == "LEFT":
+            index = (index - 1) % len(names)
+            wait_for_release("LEFT")
+
+        elif key == "RIGHT":
+            index = (index + 1) % len(names)
+            wait_for_release("RIGHT")
+
+        elif key == "UP":
+            wait_for_release("UP")
+
+            oled.fill(0)
+            oled.text("Returning...", 0, 0)
+            oled.show()
+            utime.sleep(0.3)
             return
 
-        if key1 == "LEFT":
-            index = (index - 1) % len(names)
-
-        elif key1 == "RIGHT":
-            index = (index + 1) % len(names)
-
-        elif key1 in ("UP", "DOWN"):
+        elif key == "DOWN":
             side = "R" if side == "L" else "L"
+            wait_for_release("DOWN")
 
-        elif key1 == "ACTION":
-            hold_time = 0
+        elif key == "ACTION":
+            duration = measure_action()
 
-            # Measure how long ACTION is held.
-            while read_keypad(keypad_1) == "ACTION":
-                utime.sleep(0.1)
-                hold_time += 1
+            if duration >= EXIT_HOLD_MS:
+                oled.fill(0)
+                oled.text("Leaving pass...", 0, 0)
+                oled.show()
+                utime.sleep(0.5)
+                return
 
-                # Allow Player 2 to exit during the hold.
-                if read_keypad(keypad_2) == "ACTION":
-                    return
+            elif duration >= EQUIP_HOLD_MS:
+                equip_current()
+                utime.sleep(0.8)
 
-            if hold_time >= 10:
-                # Long press: equip explosion.
-                select(names[index], side)
             else:
-                # Short press: preview explosion.
-                show_menu("Playing...")
+                show_menu("Previewing...")
                 goal_explosions.goal_explosion(
                     names[index],
                     side,
@@ -637,16 +732,10 @@ def battlepass():
                 )
 
         else:
-            utime.sleep(0.05)
+            utime.sleep(POLL_INTERVAL)
             continue
 
-        # Wait for navigation buttons to be released.
-        while read_keypad(keypad_1) == key1:
-            if read_keypad(keypad_2) == "ACTION":
-                return
-            utime.sleep(0.05)
-
-        show_menu("ACTION=preview")
+        show_menu("Tap=preview")
 
 def show_stats():
     pass
