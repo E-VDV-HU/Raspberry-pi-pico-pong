@@ -290,8 +290,10 @@ def screensaver():
 
 def screen_rotation():
     oled.fill(0)
-    oled.text("Press [ACTION] to rotate.", 0,0)
-    oled.text("Hold [ACTION] right after to confirm", 1,0)
+    oled.text("Press [ACTION]", 0,0)
+    oled.text("to rotate.", 16,0)
+    oled.text("Hold [ACTION]", 0,48)
+    oled.text("after to confirm.",0,64)
     oled.show()
     while True:
         display.fill(0)
@@ -468,7 +470,7 @@ def menu():
             preset("menu_BP")
             oled.fill(0)
             oled.text("THE PONG PASS(R)", 0, 0)
-            oled.text("COPYRIGHT IDI(TM)", 1, 0)
+            oled.text("COPYRIGHT IDI(TM)", 0, 16)
             oled.show()
         elif page == 2:
             preset("menu_ROTATION")
