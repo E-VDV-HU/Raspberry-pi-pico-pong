@@ -291,9 +291,9 @@ def screensaver():
 def screen_rotation():
     oled.fill(0)
     oled.text("Press [ACTION]", 0,0)
-    oled.text("to rotate.", 16,0)
-    oled.text("Hold [ACTION]", 0,48)
-    oled.text("after to confirm.",0,64)
+    oled.text("to rotate.", 0,16)
+    oled.text("Hold [ACTION]", 0,32)
+    oled.text("after to confirm.",0,48)
     oled.show()
     while True:
         display.fill(0)
