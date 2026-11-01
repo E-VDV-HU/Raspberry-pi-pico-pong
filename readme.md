@@ -10,6 +10,3 @@ A small game project using a Raspberry Pi Pico W and MicroPython.
 
 ## Goal
 Build a simple game, starting with Pong or Breakout, while learning MicroPython and basic game development.
-
-## Status
-Made a simple button testing script. working on main loop.
