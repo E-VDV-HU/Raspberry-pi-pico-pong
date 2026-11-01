@@ -56,8 +56,8 @@ intro_message = "SEGA"
 #oled
 WIDTH = 128
 HEIGHT = 64
-oled_pin_SCL = 7
-oled_pin_SDA = 6
+oled_pin_SCL = 14
+oled_pin_SDA = 15
 
 #pong
 difficulty = 3
@@ -188,6 +188,63 @@ def preset(var):
             [0, 0, 0, 0, 1, 1, 0, 0],
             [0, 0, 0, 0, 1, 0, 0, 0]
         ]
+    elif var == "menu_PLAY":
+        display.fill(0)
+        matrix_LIST = [
+            [0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 1, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0, 1, 0]
+        ]
+    elif var == "menu_BP":
+        matrix_LIST = [
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 0, 0],
+            [0, 1, 0, 1, 1, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0, 1, 0]
+        ]
+    elif var == "menu_ROTATION":
+        matrix_LIST = [
+            [1, 1, 1, 1, 0, 1, 1, 1],
+            [1, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 1, 0, 0, 1],
+            [1, 1, 0, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0, 1, 0]
+        ]
+    elif var == "menu_STATS": 
+        matrix_LIST = [
+            [0, 1, 0, 0, 0, 1, 1, 1],
+            [1, 1, 0, 0, 0, 1, 0, 1],
+            [0, 1, 0, 0, 0, 1, 0, 1],
+            [1, 1, 1, 0, 0, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0, 1, 0]
+        ]
+    elif var == "menu_EXIT":
+        matrix_LIST = [
+        [0, 1, 1, 1, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0],
+        [0, 1, 0, 1, 1, 1, 1, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 1, 0],
+        [1, 0, 0, 0, 0, 0, 0, 1],
+        [0, 1, 0, 0, 0, 0, 1, 0]
+    ]
+
     else:
         for i in range(10):
             led.toggle()
@@ -394,6 +451,69 @@ def pong():
     oled.fill(0)
     oled.show()
 
+def menu():
+    page = 0
+    display.fill(0)
+    def page_render(page):
+        if page == 0:
+            preset("menu_PLAY")
+            oled.fill(0)
+            oled.text("Play Pong", 0, 0)
+            oled.show()
+        elif page == 1:
+            preset("menu_BP")
+            oled.text("THE PONG PASS(R)", 0, 0)
+            oled.text("COPYRIGHT IDI(TM)", 1, 0)
+            oled.show()
+        elif page == 2:
+            preset("menu_ROTATION")
+            oled.text("Select rotation", 0, 0)
+            oled.show()
+        elif page == 3:
+            preset("menu_STATS")
+            oled.text("Select rotation", 0, 0)
+            oled.show()
+        elif page == 4:
+            preset("menu_EXIT")
+            oled.text("Exit to screensaver", 0, 0)
+            oled.show()
+
+    page_render(page)
+
+    while True:
+        if read_keypad(keypad_1) == "LEFT":
+            page -= 1
+            if page <= -1:
+                page = 4
+            page_render(page)
+            utime.sleep(0.1)
+        elif read_keypad(keypad_1) == "RIGHT":
+            page += 1
+            if page >= 4:
+                page = 0
+            page_render(page)
+            utime.sleep(0.1)
+        elif read_keypad(keypad_1) == "ACTION":
+            if page == 0:
+                pong()
+            elif page == 1:
+                battlepass()
+                utime.sleep(1)
+            elif page == 2:
+                screen_rotation()
+                utime.sleep(1)
+            elif page == 3:
+                stats()
+                utime.sleep(1)
+            elif page == 4:
+                break
+
+def battlepass():
+    pass
+
+def stats():
+    pass
+
 def main():
     oled.fill(0)
     oled.text("Welcome!", 0, 0)
@@ -403,7 +523,7 @@ def main():
     utime.sleep(1)
     display.fill(0)
     display.show()
-    pong()
+    menu()
     preset("cross")
     utime.sleep(1)
     screensaver()
