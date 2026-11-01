@@ -10,8 +10,8 @@ Connections: MAX7219 LED Matrix to Raspberry Pi Pico W
 Connections: OLED SSD1306 I2C Display
  * VCC -> 3V3 OUT (physical pin 36)
  * GND -> GND (physical pin 38)
- * SCL -> GPIO7 (physical pin 10)
- * SDA -> GPIO6 (physical pin 9)
+ * SCL -> GPIO14 (physical pin 19)
+ * SDA -> GPIO15 (physical pin 20)
 
 Connections: Analog Keypad 1
  * VCC    -> 3V3 OUT (physical pin 36)
@@ -27,6 +27,9 @@ Connections: Analog Keypad 2
 from machine import Pin, SPI, ADC, SoftI2C  # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import utime # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 import random
+import goalexplosions as goal_explosions # Goal explosions, custom driver.
+import json
+import os
 
 led = Pin("LED", Pin.OUT)
 led.on()
@@ -62,7 +65,7 @@ oled_pin_SDA = 15
 #pong
 difficulty = 3
 modifier = 1
-bot = "Both" # L, R, Both or None
+bot = "R" # L, R, Both or None
 
 #pong defaults
 axis_p1 = 4
@@ -73,6 +76,7 @@ curve_ball = 1
 score = [0,0] # [player 1,player2]
 reset = False
 count = 0
+scored = None
 
 # vars check
 if brightness < 0 or brightness > 15:
@@ -94,8 +98,29 @@ display.brightness(brightness)
 display.set_rotation(270)  # Default @ 270
 i2c = SoftI2C(scl=Pin(oled_pin_SCL), sda=Pin(oled_pin_SDA))
 oled = SSD1306_I2C(WIDTH, HEIGHT, i2c)
+goal_explosions.setup(display)
+try:
+    os.stat("stats.json")
+except OSError:
+    with open("stats.json", "w") as file:
+        json.dump({
+            "players": {
+                "1": {
+                    "equipped_explosion": "wave",
+                    "total_goals": 0
+                },
+                "2": {
+                    "equipped_explosion": "wave",
+                    "total_goals": 0
+                }
+            }
+        }, file)
 
-# Clear the display.
+
+with open("stats.json", "r") as file:
+    stats = json.load(file)["players"]
+
+# Clear the display @ boot.
 display.fill(0)
 display.show()
 oled.fill(0)
@@ -341,7 +366,7 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
             display.pixel(7, i, 1)
 
 def draw_ball(side, curve, axis_ball, count):
-    global axis_p1, axis_p2, score, reset, difficulty, modifier, bot
+    global axis_p1, axis_p2, score, reset, difficulty, modifier, bot, scored
     if count <= difficulty:
         display.pixel(axis_ball[0], axis_ball[1], 1)
         return side, curve, axis_ball, count + modifier
@@ -377,6 +402,7 @@ def draw_ball(side, curve, axis_ball, count):
                 else:
                     score[1] += 1
                     reset = True
+                    scored = "R"
 
         elif axis_ball[0] == 6 and side == "R":
             if bot == "R" or bot == "Both":
@@ -393,6 +419,7 @@ def draw_ball(side, curve, axis_ball, count):
                 else:
                     score[0] += 1
                     reset = True
+                    scored = "L"
 
     display.pixel(axis_ball[0], axis_ball[1], 1)
     if axis_ball[1] <= 0 or axis_ball[1] >= 7:
@@ -404,7 +431,7 @@ def draw_ball(side, curve, axis_ball, count):
     return side, curve, axis_ball, count
 
 def pong():
-    global axis_p1, axis_p2, axis_ball, side_ball, curve_ball, score, reset, count, modifier, difficulty
+    global axis_p1, axis_p2, axis_ball, side_ball, curve_ball, score, reset, count, modifier, difficulty, scored
     oled.fill(0)
     oled.text("0-0", 0, 0)
     oled.show()
@@ -412,6 +439,11 @@ def pong():
         display.fill(0)
         if reset:
             reset = False
+            player = "1" if scored == "L" else "2"
+            stats[player]["total_goals"] += 1
+            with open("stats.json", "w") as file:
+                json.dump({"players": stats}, file)
+            goal_explosions.goal_explosion(stats[player]["equipped_explosion"], scored, 3)
             oled.fill(0)
             oled.text(f"{score[0]}-{score[1]}", 0, 0)
             oled.show()
@@ -480,10 +512,11 @@ def menu():
         elif page == 3:
             preset("menu_STATS")
             oled.fill(0)
-            oled.text("Select rotation", 0, 0)
+            oled.text("Show stats", 0, 0)
             oled.show()
         elif page == 4:
             preset("menu_EXIT")
+            oled.fill(0)
             oled.text("Exit to screensaver", 0, 0)
             oled.show()
 
@@ -498,7 +531,7 @@ def menu():
             utime.sleep(0.1)
         elif read_keypad(keypad_1) == "RIGHT":
             page += 1
-            if page >= 4:
+            if page >= 5:
                 page = 0
             page_render(page)
             utime.sleep(0.1)
@@ -512,15 +545,110 @@ def menu():
                 screen_rotation()
                 utime.sleep(1)
             elif page == 3:
-                stats()
+                show_stats()
                 utime.sleep(1)
             elif page == 4:
                 break
 
 def battlepass():
-    pass
+    names = goal_explosions.names()
 
-def stats():
+    if not names:
+        oled.fill(0)
+        oled.text("No explosions", 0, 0)
+        oled.show()
+        utime.sleep(2)
+        return
+
+    index = 0
+    side = "L"
+
+    def select(name, selected_side):
+        player = "1" if selected_side == "L" else "2"
+
+        stats[player]["equipped_explosion"] = name
+
+        with open("stats.json", "w") as file:
+            json.dump({"players": stats}, file)
+
+        preset("checkmark")
+
+        oled.fill(0)
+        oled.text("Explosion saved!", 0, 0)
+        oled.text("Player: " + player, 0, 16)
+        oled.text(name[:16], 0, 32)
+        oled.show()
+
+        utime.sleep(1)
+
+    def show_menu(message=""):
+        player = "1" if side == "L" else "2"
+
+        oled.fill(0)
+        oled.text("{}/{}".format(index + 1, len(names)), 0, 0)
+        oled.text(names[index][:16], 0, 16)
+        oled.text("Player: " + player, 0, 32)
+        oled.text(message[:16], 0, 48)
+        oled.show()
+
+    show_menu("ACTION=preview")
+
+    while True:
+        key1 = read_keypad(keypad_1)
+        key2 = read_keypad(keypad_2)
+
+        # Player 2 can exit the Battlepass.
+        if key2 == "ACTION":
+            while read_keypad(keypad_2) == "ACTION":
+                utime.sleep(0.05)
+            return
+
+        if key1 == "LEFT":
+            index = (index - 1) % len(names)
+
+        elif key1 == "RIGHT":
+            index = (index + 1) % len(names)
+
+        elif key1 in ("UP", "DOWN"):
+            side = "R" if side == "L" else "L"
+
+        elif key1 == "ACTION":
+            hold_time = 0
+
+            # Measure how long ACTION is held.
+            while read_keypad(keypad_1) == "ACTION":
+                utime.sleep(0.1)
+                hold_time += 1
+
+                # Allow Player 2 to exit during the hold.
+                if read_keypad(keypad_2) == "ACTION":
+                    return
+
+            if hold_time >= 10:
+                # Long press: equip explosion.
+                select(names[index], side)
+            else:
+                # Short press: preview explosion.
+                show_menu("Playing...")
+                goal_explosions.goal_explosion(
+                    names[index],
+                    side,
+                    3
+                )
+
+        else:
+            utime.sleep(0.05)
+            continue
+
+        # Wait for navigation buttons to be released.
+        while read_keypad(keypad_1) == key1:
+            if read_keypad(keypad_2) == "ACTION":
+                return
+            utime.sleep(0.05)
+
+        show_menu("ACTION=preview")
+
+def show_stats():
     pass
 
 def main():

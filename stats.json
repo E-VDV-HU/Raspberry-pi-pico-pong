@@ -1,0 +1,12 @@
+{
+    "players": {
+        "1": {
+            "equipped_explosion": "wave",
+            "total_goals": 0
+        },
+        "2": {
+            "equipped_explosion": "wave",
+            "total_goals": 0
+        }
+    }
+}
