@@ -1,6 +1,5 @@
 """
 Connections: MAX7219 LED Matrix to Raspberry Pi Pico W
-
  * VCC -> VBUS (5V, physical pin 40)
  * GND -> GND (physical pin 3)
  * DIN -> GPIO3 (physical pin 5)
@@ -312,15 +311,54 @@ def screen_text(text):
         utime.sleep(0.1)
 
 def screensaver():
+    """Plays random goal explosions until ACTION is pressed. Returns "code 0"."""
+
+    def wait_for_release():
+        while read_keypad(keypad_1) is not None:
+            utime.sleep(0.02)
+        utime.sleep(0.12)  # debounce
+
+    wait_for_release()  # ignore the press that got us here
+
+    names = goal_explosions.names()
+    if not names:
+        oled.fill(0)
+        oled.text("No explosions", 0, 0)
+        oled.show()
+        utime.sleep(2)
+        return "code 0"
+
+    oled.fill(0)
+    oled.text("Screensaver", 0, 0)
+    oled.text("ACTION: exit", 0, 48)
+    oled.show()
+
+    last = None
     while True:
-        for x in range(8):
-            for y in range(8):
-                display.fill(0)
-                display.pixel(x, y, 1)
-                display.show()
-                utime.sleep(0.1)
-                if read_keypad(keypad_1) == "ACTION":
-                    return "code 0"
+        # Random pick, never the same explosion twice in a row
+        name = random.choice(names)
+        while len(names) > 1 and name == last:
+            name = random.choice(names)
+        last = name
+
+        side = "L" if random.randint(0, 1) else "R"
+
+        oled.fill(0)
+        oled.text("Screensaver", 0, 0)
+        oled.text(name[:16], 0, 16)
+        oled.text("ACTION: exit", 0, 48)
+        oled.show()
+
+        goal_explosions.goal_explosion(name, side, 3)
+
+        # Short pause between explosions, polling the keypad so exit is responsive
+        display.fill(0)
+        display.show()
+        for _ in range(50):  # about 1 s
+            if read_keypad(keypad_1) == "ACTION":
+                wait_for_release()
+                return "code 0"
+            utime.sleep(0.02)
 
 def screen_rotation():
     global display_rotation
@@ -417,71 +455,70 @@ def draw_paddle(player, axis): # display.pixel (x, y, on_off)
 
 def draw_ball(side, curve, axis_ball, count):
     global axis_p1, axis_p2, score, reset, difficulty, modifier, bot, scored
+
     if count <= difficulty:
         display.pixel(axis_ball[0], axis_ball[1], 1)
         return side, curve, axis_ball, count + modifier
-    else:
-        count = 0
-        for x in range(1, 7):
-            for y in range(0, 8):
-                display.pixel(x, y, 0)
 
-        if side == "L":
-            axis_ball[0] -= 1
-        elif side == "R":
-            axis_ball[0] += 1
+    count = 0
+    for x in range(1, 7):
+        for y in range(0, 8):
+            display.pixel(x, y, 0)
 
-        axis_ball[1] += curve
-        if axis_ball[1] < 0:
-            axis_ball[1] = 0
-        elif axis_ball[1] > 7:
-            axis_ball[1] = 7
+    axis_ball[0] += -1 if side == "L" else 1
 
-        if axis_ball[0] == 1 and side == "L":
-            if bot == "L" or bot == "Both":
+    y = axis_ball[1] + curve
+    if y < 0:
+        y = -y
+        curve = -curve
+    elif y > 7:
+        y = 14 - y
+        curve = -curve
+    axis_ball[1] = y
+
+    def paddle_hit(paddle_axis, curve):
+        offset = axis_ball[1] - paddle_axis
+        if abs(offset) > 1:
+            return False, curve
+        if offset == 0:
+            curve = 1 if curve > 0 else -1
+        else:
+            curve = 2 if offset > 0 else -2
+        return True, curve
+
+    if axis_ball[0] == 1 and side == "L":
+        if bot == "L" or bot == "Both":
+            side = "R"
+        else:
+            hit, curve = paddle_hit(axis_p1, curve)
+            if hit:
                 side = "R"
             else:
-                hit = abs(axis_ball[1] - axis_p1) <= 1
-                if hit:
-                    offset = axis_ball[1] - axis_p1
-                    if abs(offset) == 1:
-                        curve = 2 if offset > 0 else -2
-                    else:
-                        curve = -1
-                    side = "R"
-                else:
-                    score[1] += 1
-                    reset = True
-                    scored = "R"
+                score[1] += 1
+                reset = True
+                scored = "R"
 
-        elif axis_ball[0] == 6 and side == "R":
-            if bot == "R" or bot == "Both":
+    elif axis_ball[0] == 6 and side == "R":
+        if bot == "R" or bot == "Both":
+            side = "L"
+        else:
+            hit, curve = paddle_hit(axis_p2, curve)
+            if hit:
                 side = "L"
             else:
-                hit = abs(axis_ball[1] - axis_p2) <= 1
-                if hit:
-                    offset = axis_ball[1] - axis_p2
-                    if abs(offset) == 1:
-                        curve = 2 if offset > 0 else -2
-                    else:
-                        curve = -1
-                    side = "L"
-                else:
-                    score[0] += 1
-                    reset = True
-                    scored = "L"
+                score[0] += 1
+                reset = True
+                scored = "L"
 
     display.pixel(axis_ball[0], axis_ball[1], 1)
-    if axis_ball[1] <= 0 or axis_ball[1] >= 7:
-        curve = -(curve)
-    if axis_ball[1] < 0:
-        axis_ball[1] = 0
-    elif axis_ball[1] > 7:
-        axis_ball[1] = 7
     return side, curve, axis_ball, count
 
 def pong():
     global axis_p1, axis_p2, axis_ball, side_ball, curve_ball, score, reset, count, modifier, difficulty, scored
+    oled.fill(0)
+    oled.text("Loading...",0,0)
+    oled.show()
+    utime.sleep(1)
     oled.fill(0)
     oled.text("0-0", 0, 0)
     oled.show()
@@ -490,19 +527,24 @@ def pong():
         if reset:
             reset = False
             player = "1" if scored == "L" else "2"
+
             stats[player]["total_goals"] += 1
             with open("stats.json", "w") as file:
                 json.dump({"players": stats}, file)
-            goal_explosions.goal_explosion(stats[player]["equipped_explosion"], scored, 3)
+            goal_explosions.goal_explosion(
+                stats[player]["equipped_explosion"], scored, 3)
             oled.fill(0)
             oled.text(f"{score[0]}-{score[1]}", 0, 0)
             oled.show()
             screen_text(f"{score[0]}-{score[1]}")
-            curve_ball = 1 if random.randint(0, 1) else -1 # Noosphere-chat recommendation (https://noosphere-chat.pages.dev/)
-            axis_ball = [5, 6]
+            side_ball = "R" if scored == "L" else "L"
+            curve_ball = 1 if random.randint(0, 1) else -1
+            if scored == "R":
+                axis_ball = [5, 6]
+            else:
+                axis_ball = [2, 6]
             axis_p1 = 4
             axis_p2 = 3
-            side_ball = "L"
             count = 0
 
         draw_paddle(1, axis_p1)
@@ -515,6 +557,8 @@ def pong():
         key2 = read_keypad(keypad_2)
 
         if key1 == "ACTION":
+            while (read_keypad(keypad_1) == "ACTION"):
+                utime.sleep(0.02)
             break
         elif key1 == "UP":
             axis_p1 -= 1
@@ -567,7 +611,8 @@ def menu():
         elif page == 4:
             preset("menu_EXIT")
             oled.fill(0)
-            oled.text("Exit to screensaver", 0, 0)
+            oled.text("Exit to", 0, 0)
+            oled.text("screensaver", 0, 16)
             oled.show()
 
     page_render(page)
@@ -588,6 +633,12 @@ def menu():
         elif read_keypad(keypad_1) == "ACTION":
             if page == 0:
                 pong()
+                oled.fill(0)
+                oled.text("Select rotation", 0, 0)
+                oled.show()
+                preset("menu_PLAY")
+                display.show()
+                utime.sleep(1)
             elif page == 1:
                 battlepass()
                 utime.sleep(1)
@@ -738,7 +789,96 @@ def battlepass():
         show_menu("Tap=preview")
 
 def show_stats():
-    pass
+    def wait_for_release():
+        while read_keypad(keypad_1) is not None:
+            utime.sleep(0.02)
+        utime.sleep(0.12)  # debounce
+
+    # Don't let the ACTION press that opened this screen count as "exit"
+    wait_for_release()
+
+    g1 = stats["1"]["total_goals"]
+    g2 = stats["2"]["total_goals"]
+    total = g1 + g2
+    pct1 = (g1 * 100) // total if total else 50
+    pct2 = 100 - pct1
+
+    if g1 > g2:
+        lead_text = "Lead: P1 (+{})".format(g1 - g2)
+        lead_icon = "arrow_l"   # P1 is the left paddle
+    elif g2 > g1:
+        lead_text = "Lead: P2 (+{})".format(g2 - g1)
+        lead_icon = "arrow_r"
+    else:
+        lead_text = "Tied!"
+        lead_icon = "menu_STATS"
+
+    pages = 3
+    page = 0
+
+    # Non-blocking matrix scroller state
+    scroll_msg = None
+    scroll_x = 8
+    last_tick = utime.ticks_ms()
+
+    def render():
+        nonlocal scroll_msg, scroll_x
+        scroll_msg = None
+
+        oled.fill(0)
+        oled.text("STATS {}/{}".format(page + 1, pages), 0, 0)
+        if page == 0:
+            oled.text("P1 goals: {}".format(g1), 0, 16)
+            oled.text("P2 goals: {}".format(g2), 0, 32)
+            oled.text("Total: {}".format(total), 0, 48)
+            # Matrix: scroll "74-61"
+            scroll_msg = "{}-{}".format(g1, g2)
+            scroll_x = 8
+        elif page == 1:
+            oled.text("P1 {}%  P2 {}%".format(pct1, pct2), 0, 16)
+            oled.text(lead_text[:16], 0, 32)
+            preset(lead_icon)
+        else:
+            oled.text(("P1: " + stats["1"]["equipped_explosion"])[:16], 0, 16)
+            oled.text(("P2: " + stats["2"]["equipped_explosion"])[:16], 0, 32)
+            oled.text("ACTION: back", 0, 48)
+            preset("menu_BP")
+        oled.show()
+
+    def tick_scroll():
+        nonlocal scroll_x, last_tick
+        if scroll_msg is None:
+            return
+        now = utime.ticks_ms()
+        if utime.ticks_diff(now, last_tick) < 100:
+            return
+        last_tick = now
+        display.fill(0)
+        display.text(scroll_msg, scroll_x, 0, 1)
+        display.show()
+        scroll_x -= 1
+        if scroll_x < -len(scroll_msg) * 8:
+            scroll_x = 8
+
+    render()
+
+    while True:
+        key = read_keypad(keypad_1)
+
+        if key == "LEFT":
+            page = (page - 1) % pages
+            wait_for_release()
+            render()
+        elif key == "RIGHT":
+            page = (page + 1) % pages
+            wait_for_release()
+            render()
+        elif key in ("ACTION", "UP"):
+            wait_for_release()
+            return
+        else:
+            tick_scroll()
+            utime.sleep(0.02)
 
 def main():
     oled.fill(0)
@@ -755,9 +895,10 @@ def main():
     screensaver()
     preset("cross")
     utime.sleep(1)
+    oled.fill(0)
     display.fill(0)
+    oled.show()
     display.show()
-    utime.sleep(1)
 
 if __name__ == "__main__":
     main()
